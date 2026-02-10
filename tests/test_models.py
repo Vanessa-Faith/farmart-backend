@@ -81,8 +81,8 @@ class TestAnimalModel:
     def test_create_animal(self, app):
         """Test creating an animal"""
         animal = Animal(
-            name='Bessie',
-            species='Cow',
+            title='Bessie',
+            animal_type='Cow',
             breed='Holstein',
             age=3,
             price=1500.00,
@@ -90,8 +90,8 @@ class TestAnimalModel:
             farmer_id=1
         )
         
-        assert animal.name == 'Bessie'
-        assert animal.species == 'Cow'
+        assert animal.title == 'Bessie'
+        assert animal.animal_type == 'Cow'
         assert animal.breed == 'Holstein'
         assert animal.age == 3
         assert animal.price == 1500.00
@@ -100,8 +100,8 @@ class TestAnimalModel:
     def test_animal_default_status(self, app):
         """Test animal default status is available"""
         animal = Animal(
-            name='Test Animal',
-            species='Cow',
+            title='Test Animal',
+            animal_type='Cow',
             price=100.00,
             farmer_id=1
         )
@@ -111,8 +111,8 @@ class TestAnimalModel:
     def test_animal_to_dict(self, app):
         """Test animal to_dict method"""
         animal = Animal(
-            name='Bessie',
-            species='Cow',
+            title='Bessie',
+            animal_type='Cow',
             breed='Holstein',
             age=3,
             price=1500.00,
@@ -125,8 +125,8 @@ class TestAnimalModel:
         data = animal.to_dict()
         
         assert data['id'] == 1
-        assert data['name'] == 'Bessie'
-        assert data['species'] == 'Cow'
+        assert data['title'] == 'Bessie'
+        assert data['animal_type'] == 'Cow'
         assert data['breed'] == 'Holstein'
         assert data['age'] == 3
         assert data['price'] == 1500.00
@@ -201,10 +201,12 @@ class TestOrderItemModel:
             order_id=1,
             animal_id=1,
             quantity=1,
-            price=1500.00
+            unit_price=1500.00,
+            farmer_id=2
         )
         
         assert order_item.order_id == 1
         assert order_item.animal_id == 1
         assert order_item.quantity == 1
-        assert order_item.price == 1500.00
+        assert order_item.unit_price == 1500.00
+        assert order_item.farmer_id == 2

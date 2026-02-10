@@ -40,7 +40,7 @@ Table orders {
   id serial [pk]
   buyer_id int [ref: > users.id]
   total_amount decimal(10,2)
-  status varchar [note: 'created|paid|confirmed|rejected|shipped', default: 'created']
+  status varchar [note: 'pending|paid|confirmed|rejected|shipped', default: 'pending']
   created_at timestamp [default: `now()`]
   updated_at timestamp
 }

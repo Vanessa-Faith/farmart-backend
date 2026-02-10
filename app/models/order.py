@@ -8,13 +8,18 @@ class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     buyer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     total_amount = db.Column(db.Numeric(10, 2), nullable=False)
-    status = db.Column(db.String(20), default='created')  # 'created', 'paid', 'confirmed', 'rejected', 'shipped'
+    status = db.Column(db.String(20), default='pending')  # 'pending', 'paid', 'confirmed', 'rejected', 'shipped'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
     payments = db.relationship('Payment', backref='order', lazy=True)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.status is None:
+            self.status = 'pending'
     
     def to_dict(self):
         """Convert order to dictionary"""
