@@ -1,162 +1,307 @@
-# Farmart Backend API
+#  FarmArt Backend
 
-E-commerce platform connecting farmers directly with buyers to eliminate middlemen.
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
+[![Flask](https://img.shields.io/badge/Flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Quick Start
+> A robust Flask-based backend API for livestock trading and order management
 
-### 1. Setup Environment
+##  Features
 
-```bash
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+- ** Secure Authentication** - JWT-based authentication with role-based access control
+- ** User Management** - Separate roles for buyers and farmers with proper authorization
+- ** Animal Catalog** - Farmers can list available livestock with pricing and availability
+- ** Complete Order Management** - Full order lifecycle from creation to confirmation
+- ** Database Ready** - SQLAlchemy ORM with SQLite (development) and PostgreSQL (production) support
+- ** RESTful API** - Clean, well-documented REST endpoints with comprehensive error handling
+- ** Production Ready** - Environment-based configuration, logging, and error handling
 
-# Install dependencies
-pip install -r requirements.txt
+##  Tech Stack
 
-# Setup environment variables
-cp .env.example .env
-# Edit .env and update DATABASE_URL, SECRET_KEY, JWT_SECRET_KEY
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Web Framework** | Flask 3.0.0 | Lightweight web framework |
+| **ORM** | Flask-SQLAlchemy 3.1.1 | Database abstraction layer |
+| **Authentication** | Flask-JWT-Extended 4.6.0 | JWT token-based authentication |
+| **Database** | SQLite/PostgreSQL | Data persistence |
+| **Configuration** | python-dotenv 1.0.0 | Environment variable management |
+| **Runtime** | Python 3.8+ | Application runtime |
+
+##  Installation
+
+### Prerequisites
+- Python 3.8 or higher
+- pip package manager
+
+### Quick Start
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd farmart-backend
+   ```
+
+2. **Set up virtual environment**
+   ```bash
+   python -m venv venv
+   # On Linux/Mac:
+   source venv/bin/activate
+   # On Windows:
+   venv\Scripts\activate
+   ```
+
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Configure environment** (optional)
+   ```bash
+   # Development configuration
+   export FLASK_ENV=development
+   export DATABASE_URL=sqlite:///farmart.db
+   export JWT_SECRET_KEY=your-secure-secret-key-here
+   ```
+
+5. **Run the application**
+   ```bash
+   python -m flask run
+   ```
+
+   The API will be available at `http://localhost:5000`
+
+##  API Endpoints
+
+### Authentication
+All endpoints require a valid JWT token in the Authorization header:
+```
+Authorization: Bearer <your-jwt-token>
 ```
 
-### 2. Setup Database
+### Order Management
 
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/api/orders` | Get user's orders | Buyers & Farmers |
+| `GET` | `/api/orders/<id>` | Get specific order | Buyers & Farmers |
+| `POST` | `/api/orders` | Create new order | Buyers only |
+| `POST` | `/api/orders/<id>/pay` | Mark order as paid | Buyers only |
+| `POST` | `/api/orders/<id>/confirm` | Confirm order | Farmers only |
+| `POST` | `/api/orders/<id>/reject` | Reject order | Farmers only |
+
+### Example API Usage
+
+**Create an Order**
 ```bash
-# Start PostgreSQL with Docker
-docker run --name farmart-db \
-  -e POSTGRES_PASSWORD=pass \
-  -e POSTGRES_USER=dev \
-  -e POSTGRES_DB=farmart \
-  -p 5432:5432 \
-  -d postgres:15
-
-# Run migrations
-flask db init
-flask db migrate -m "Initial migration"
-flask db upgrade
+curl -X POST http://localhost:5000/api/orders \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      {
+        "animal_id": 1,
+        "quantity": 2
+      }
+    ]
+  }'
 ```
 
-### 3. Run the Application
-
-```bash
-python run.py
+**Response**
+```json
+{
+  "id": 1,
+  "buyer_id": 1,
+  "status": "pending",
+  "created_at": "2023-10-01T10:30:00",
+  "items": [
+    {
+      "id": 1,
+      "animal_id": 1,
+      "farmer_id": 2,
+      "quantity": 2
+    }
+  ]
+}
 ```
 
-API runs at `http://localhost:5000`
+## 🗄️ Database Schema
 
-Test health endpoint: `curl http://localhost:5000/api/health`
+### Core Models
 
-## Project Structure
+#### User
+```sql
+CREATE TABLE user (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username VARCHAR(80) UNIQUE NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK(role IN ('buyer', 'farmer'))
+);
+```
 
+#### Animal
+```sql
+CREATE TABLE animal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(100) NOT NULL,
+    farmer_id INTEGER NOT NULL,
+    available BOOLEAN DEFAULT 1,
+    price FLOAT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (farmer_id) REFERENCES user (id)
+);
+```
+
+#### Order
+```sql
+CREATE TABLE order (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    buyer_id INTEGER NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (buyer_id) REFERENCES user (id)
+);
+```
+
+#### OrderItem
+```sql
+CREATE TABLE order_item (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL,
+    animal_id INTEGER NOT NULL,
+    farmer_id INTEGER NOT NULL,
+    quantity INTEGER NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES order (id),
+    FOREIGN KEY (animal_id) REFERENCES animal (id),
+    FOREIGN KEY (farmer_id) REFERENCES user (id)
+);
+```
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FLASK_ENV` | `development` | Application environment |
+| `DATABASE_URL` | `sqlite:///farmart.db` | Database connection string |
+| `JWT_SECRET_KEY` | `dev-secret-key-change-in-production` | JWT signing key |
+
+### Configuration Profiles
+
+- **Development**: Debug mode enabled, SQLite database, detailed logging
+- **Testing**: In-memory database, test-specific settings
+- **Production**: Environment variables required, optimized settings
+
+## 🚨 Error Handling
+
+The API provides consistent error responses:
+
+```json
+{
+  "error": "Descriptive error message"
+}
+```
+
+### HTTP Status Codes
+
+| Code | Description |
+|------|-------------|
+| `200` | Success |
+| `201` | Resource created |
+| `400` | Bad request (validation errors) |
+| `401` | Unauthorized |
+| `403` | Forbidden (authorization failure) |
+| `404` | Resource not found |
+| `500` | Internal server error |
+
+## 🏗️ Development
+
+### Code Style
+- Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/) guidelines
+- Use meaningful variable and function names
+- Add comprehensive docstrings to all functions and classes
+- Implement proper logging for production monitoring
+
+### Project Structure
 ```
 farmart-backend/
-├── app/
-│   ├── __init__.py          # App factory
-│   ├── models/              # Database models
-│   │   ├── user.py         # User (farmers & buyers)
-│   │   ├── animal.py       # Animal listings
-│   │   ├── cart.py         # Cart & CartItem
-│   │   ├── order.py        # Order & OrderItem
-│   │   └── payment.py      # Payment records
-│   └── routes/              # API endpoints
-│       ├── auth.py         # Register, login, JWT
-│       ├── animals.py      # CRUD animals, search, filter
-│       ├── carts.py        # Cart management
-│       └── orders.py       # Orders, confirm/reject, payment
-├── db/
-│   └── schema.dbml         # Database schema for dbdiagram.io
-├── config.py               # Configuration
-├── run.py                  # Entry point
-├── requirements.txt        # Dependencies
-└── .env.example           # Environment template
+├── app/                          # Main application package
+│   ├── __init__.py              # Application factory
+│   ├── models/                  # Database models
+│   │   ├── __init__.py
+│   │   └── models.py            # User, Animal, Order models
+│   └── routes/                  # API endpoints
+│       ├── __init__.py
+│       └── orders.py            # Order management endpoints
+├── config.py                    # Configuration classes
+├── requirements.txt             # Production dependencies
+├── README.md                    # This file
+└── TECHNICAL_DOCUMENTATION.md   # Technical documentation
 ```
 
-## API Endpoints
+### Testing
+Tests should be added to the `tests/` directory following pytest conventions.
 
-### Auth (`/api/auth`)
-- `POST /register` - Register new user
-- `POST /login` - Login and get JWT token
-- `GET /me` - Get current user (protected)
+### Contributing
 
-### Animals (`/api/animals`)
-- `GET /` - List all animals (with filters)
-- `GET /:id` - Get animal details
-- `POST /` - Create animal (farmer only)
-- `PUT /:id` - Update animal (owner only)
-- `DELETE /:id` - Delete animal (owner only)
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes with proper commit messages
+4. Add tests for your changes
+5. Run the test suite (`pytest`)
+6. Submit a pull request
 
-### Cart (`/api/carts`)
-- `GET /` - Get current cart
-- `POST /items` - Add item to cart
-- `PUT /items/:id` - Update cart item
-- `DELETE /items/:id` - Remove from cart
+## 🚀 Deployment
 
-### Orders (`/api/orders`)
-- `GET /` - Get user's orders
-- `GET /:id` - Get order details
-- `POST /` - Create order from cart
-- `POST /:id/confirm` - Farmer confirms order
-- `POST /:id/reject` - Farmer rejects order
-- `POST /:id/pay` - Process payment
+### Production Requirements
+- Python 3.8+
+- PostgreSQL database
+- Production WSGI server (Gunicorn, uWSGI)
+- Reverse proxy (nginx recommended)
+- Environment variables configured
 
-## Feature-Based Development (Team Workflow)
+### Deployment Steps
+1. Set production environment variables
+2. Install production dependencies
+3. Run database migrations
+4. Configure reverse proxy
+5. Set up monitoring and logging
+6. Implement backup strategies
 
-Each team member owns ONE feature end-to-end (backend + frontend):
+## 📋 Order Lifecycle
 
-### Features Assignment:
-1. **Authentication** - Team Lead (Vanessa) - 🧪 IN TESTING
-   - Backend: Register/Login with validation (implemented, needs testing)
-   - Frontend: Redux auth, Login/Register forms, JWT handling (implemented, needs testing)
-   
-2. **Animals Listings** - Assign to team member
-   - Backend: CRUD endpoints with search/filter
-   - Frontend: Animal list page, detail page, create/edit forms (farmers)
-   
-3. **Shopping Cart** - Assign to team member
-   - Backend: Add/update/remove cart items
-   - Frontend: Cart page, add-to-cart buttons, quantity controls
-   
-4. **Orders & Payment** - Assign to team member
-   - Backend: Create order, farmer confirm/reject, payment integration
-   - Frontend: Checkout flow, order history, farmer order management
-   
-5. **QA & Testing** - Assign to team member
-   - Write Cypress E2E tests for all features
-   - Manual testing and bug reporting
-   - Test data creation
+```mermaid
+graph TD
+    A[Order Created] --> B[Pending Payment]
+    B --> C[Paid]
+    C --> D[Confirmed]
+    B --> E[Rejected]
+    C --> E
+```
 
-### Development Workflow:
-1. Each person creates a feature branch: `git checkout -b feature/animals`
-2. Implement both backend AND frontend for your feature
-3. Test your feature end-to-end locally
-4. Create PR when complete
-5. Team reviews PR within 24 hours
-6. Merge to dev branch
+1. **Order Creation**: Buyer creates order with selected animals
+2. **Pending Payment**: Order status set to 'pending'
+3. **Payment**: Buyer marks order as 'paid'
+4. **Confirmation**: Farmer confirms order fulfillment
+5. **Completion**: Order status becomes 'confirmed'
 
-### Daily Standups (15 min):
-- What did you complete yesterday?
-- What are you working on today?
-- Any blockers?
+## 📄 License
 
-## Sprint Timeline (2 weeks - Jan 27 to Feb 10, 2026)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-**Days 1-3**: Auth (DONE ✅) + Animals feature kickoff  
-**Days 4-7**: Animals complete + Cart feature  
-**Days 8-11**: Orders/Payment + E2E testing  
-**Days 12-13**: Bug fixes + polish  
-**Day 14**: Demo rehearsal
+## 🤝 Contributing
 
-## Notes
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
-- **Auth is COMPLETE** - backend validation + frontend Redux working
-- Routes with `# TODO:` are skeleton structure for team members
-- Models are complete and match the DBML schema
-- JWT authentication configured and tested
-- CORS enabled for frontend (http://localhost:5173 for Vite)
-- Use `@jwt_required()` decorator for protected routes
-- Get current user ID with `get_jwt_identity()`
-- Frontend runs on Vite (port 5173), backend on Flask (port 5000)
+## 📞 Support
+
+For support, email support@farmart.com or join our Slack channel.
+
+## 🙏 Acknowledgments
+
+- Flask community for the excellent web framework
+- SQLAlchemy team for powerful ORM capabilities
+- All contributors who have helped improve this project
 
 ---
 
-**Database Schema**: View on dbdiagram.io (link from team lead)
+**Made with ❤️ for the farming community**
