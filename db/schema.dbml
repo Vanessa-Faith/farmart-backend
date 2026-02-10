@@ -1,0 +1,65 @@
+Table users {
+  id serial [pk]
+  name varchar
+  email varchar [unique, not null]
+  password_hash varchar [not null]
+  role varchar [note: 'farmer|buyer', default: 'buyer']
+  created_at timestamp [default: `now()`]
+}
+
+Table animals {
+  id serial [pk]
+  farmer_id int [ref: > users.id]
+  title varchar
+  animal_type varchar
+  breed varchar
+  age int
+  price decimal(10,2)
+  quantity int [default: 1]
+  description text
+  status varchar [note: 'available|pending|sold', default: 'available']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+Table carts {
+  id serial [pk]
+  buyer_id int [ref: > users.id]
+  created_at timestamp [default: `now()`]
+}
+
+Table cart_items {
+  id serial [pk]
+  cart_id int [ref: > carts.id]
+  animal_id int [ref: > animals.id]
+  quantity int [default: 1]
+  added_at timestamp [default: `now()`]
+}
+
+Table orders {
+  id serial [pk]
+  buyer_id int [ref: > users.id]
+  total_amount decimal(10,2)
+  status varchar [note: 'created|paid|confirmed|rejected|shipped', default: 'created']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+Table order_items {
+  id serial [pk]
+  order_id int [ref: > orders.id]
+  animal_id int [ref: > animals.id]
+  farmer_id int [ref: > users.id]
+  quantity int
+  unit_price decimal(10,2)
+}
+
+Table payments {
+  id serial [pk]
+  order_id int [ref: > orders.id]
+  amount decimal(10,2)
+  provider varchar
+  provider_transaction_id varchar
+  status varchar [note: 'pending|succeeded|failed']
+  created_at timestamp [default: `now()`]
+}
