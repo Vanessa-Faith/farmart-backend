@@ -1,6 +1,3 @@
-from app.models.user import User
-from app.models.animal import Animal
-from app.models.order import Order
-from app.models.order_item import OrderItem
+from .models import db, User, Animal, Order, OrderItem
 
-__all__ = ['User', 'Animal', 'Order', 'OrderItem']
+__all__ = ['db', 'User', 'Animal', 'Order', 'OrderItem']
