@@ -18,7 +18,7 @@ def register():
     """
     Register a new user (farmer or buyer)
     """
-    data = request.get_json()
+    data = request.get_json(silent=True)
     
     # Validate required fields
     if not data:
@@ -70,7 +70,7 @@ def login():
     """
     Login user and return JWT token
     """
-    data = request.get_json()
+    data = request.get_json(silent=True)
     
     # Validate required fields
     if not data:
@@ -90,7 +90,7 @@ def login():
         return jsonify({'message': 'Invalid credentials'}), 401
     
     # Generate access token
-    access_token = create_access_token(identity=user.id)
+    access_token = create_access_token(identity=str(user.id))
     
     return jsonify({
         'access_token': access_token,
@@ -105,7 +105,11 @@ def get_current_user():
     Get current authenticated user
     """
     try:
-        user_id = get_jwt_identity()
+        identity = get_jwt_identity()
+        try:
+            user_id = int(identity)
+        except (TypeError, ValueError):
+            return jsonify({'message': 'Invalid token identity'}), 422
         user = User.query.get(user_id)
         
         if not user:

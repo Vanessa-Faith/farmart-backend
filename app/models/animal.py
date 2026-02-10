@@ -17,6 +17,11 @@ class Animal(db.Model):
     status = db.Column(db.String(20), default='available')  # 'available', 'pending', 'sold'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.status is None:
+            self.status = 'available'
     
     def to_dict(self):
         """Convert animal to dictionary"""
