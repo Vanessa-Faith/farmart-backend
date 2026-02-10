@@ -2,90 +2,115 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from app import db
 from app.models.user import User
-from marshmallow import Schema, fields, ValidationError
+import re
 
 auth_bp = Blueprint('auth', __name__)
 
-class UserRegistrationSchema(Schema):
-    email = fields.Email(required=True)
-    password = fields.Str(required=True, validate=lambda x: len(x) >= 6)
-    first_name = fields.Str(required=True)
-    last_name = fields.Str(required=True)
-    user_type = fields.Str(required=True, validate=lambda x: x in ['farmer', 'user'])
-    phone = fields.Str()
-    county = fields.Str()
 
-class UserLoginSchema(Schema):
-    email = fields.Email(required=True)
-    password = fields.Str(required=True)
+def validate_email(email):
+    """Validate email format"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
 
-registration_schema = UserRegistrationSchema()
-login_schema = UserLoginSchema()
 
-@auth_bp.route('/api/auth/register', methods=['POST'])
+@auth_bp.route('/register', methods=['POST'])
 def register():
+    """
+    Register a new user (farmer or buyer)
+    """
+    data = request.get_json()
+    
+    # Validate required fields
+    if not data:
+        return jsonify({'message': 'No data provided'}), 400
+    
+    required_fields = ['name', 'email', 'password']
+    for field in required_fields:
+        if not data.get(field):
+            return jsonify({'message': f'{field} is required'}), 400
+    
+    # Validate email format
+    if not validate_email(data.get('email')):
+        return jsonify({'message': 'Invalid email format'}), 400
+    
+    # Validate password length
+    if len(data.get('password')) < 6:
+        return jsonify({'message': 'Password must be at least 6 characters'}), 400
+    
+    # Validate role
+    role = data.get('role', 'buyer')
+    if role not in ['farmer', 'buyer']:
+        return jsonify({'message': 'Role must be either farmer or buyer'}), 400
+    
+    # Check if email already exists
+    existing_user = User.query.filter_by(email=data.get('email')).first()
+    if existing_user:
+        return jsonify({'message': 'Email already registered'}), 409
+    
+    # Create new user
     try:
-        data = request.get_json()
-        validated_data = registration_schema.load(data)
-        
-        if User.query.filter_by(email=validated_data['email']).first():
-            return jsonify({'error': 'Email already registered'}), 400
-        
         user = User(
-            email=validated_data['email'],
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name'],
-            user_type=validated_data['user_type'],
-            phone=validated_data.get('phone'),
-            county=validated_data.get('county')
+            name=data.get('name'),
+            email=data.get('email'),
+            role=role
         )
-        user.set_password(validated_data['password'])
+        user.set_password(data.get('password'))
         
         db.session.add(user)
         db.session.commit()
         
-        access_token = create_access_token(identity=user.id)
-        
-        return jsonify({
-            'message': 'User registered successfully',
-            'access_token': access_token,
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'user_type': user.user_type
-            }
-        }), 201
-        
-    except ValidationError as e:
-        return jsonify({'errors': e.messages}), 400
+        return jsonify({'message': 'User registered successfully', 'user': user.to_dict()}), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': 'Registration failed'}), 500
+        return jsonify({'message': 'Registration failed', 'error': str(e)}), 500
 
-@auth_bp.route('/api/auth/login', methods=['POST'])
+
+@auth_bp.route('/login', methods=['POST'])
 def login():
+    """
+    Login user and return JWT token
+    """
+    data = request.get_json()
+    
+    # Validate required fields
+    if not data:
+        return jsonify({'message': 'No data provided'}), 400
+    
+    if not data.get('email') or not data.get('password'):
+        return jsonify({'message': 'Email and password are required'}), 400
+    
+    # Find user by email
+    user = User.query.filter_by(email=data.get('email')).first()
+    
+    # Verify user exists and password is correct
+    if not user:
+        return jsonify({'message': 'Invalid credentials'}), 401
+    
+    if not user.check_password(data.get('password')):
+        return jsonify({'message': 'Invalid credentials'}), 401
+    
+    # Generate access token
+    access_token = create_access_token(identity=user.id)
+    
+    return jsonify({
+        'access_token': access_token,
+        'user': user.to_dict()
+    }), 200
+
+
+@auth_bp.route('/me', methods=['GET'])
+@jwt_required()
+def get_current_user():
+    """
+    Get current authenticated user
+    """
     try:
-        data = request.get_json()
-        validated_data = login_schema.load(data)
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
         
-        user = User.query.filter_by(email=validated_data['email']).first()
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
         
-        if not user or not user.check_password(validated_data['password']):
-            return jsonify({'error': 'Invalid email or password'}), 401
-        
-        access_token = create_access_token(identity=user.id)
-        
-        return jsonify({
-            'message': 'Login successful',
-            'access_token': access_token,
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'user_type': user.user_type
-            }
-        }), 200
-        
-    except ValidationError as e:
-        return jsonify({'errors': e.messages}), 400
+        return jsonify(user.to_dict()), 200
     except Exception as e:
-        return jsonify({'error': 'Login failed'}), 500
+        return jsonify({'message': 'Failed to get user', 'error': str(e)}), 500

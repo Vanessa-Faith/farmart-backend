@@ -1,38 +1,39 @@
-from datetime import datetime
 from app import db
+from datetime import datetime
+
 
 class Animal(db.Model):
     __tablename__ = 'animals'
     
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
-    type = db.Column(db.String(50), nullable=False)
-    breed = db.Column(db.String(50), nullable=False)
-    age_months = db.Column(db.Integer, nullable=False)
-    price_per_unit = db.Column(db.Numeric(10, 2), nullable=False)
-    quantity_available = db.Column(db.Integer, nullable=False, default=1)
-    images = db.Column(db.JSON, default=list)
-    county = db.Column(db.String(50), nullable=False)
-    status = db.Column(db.String(20), default='available')
     farmer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    animal_type = db.Column(db.String(50), nullable=False, index=True)
+    breed = db.Column(db.String(100), index=True)
+    age = db.Column(db.Integer)
+    price = db.Column(db.Numeric(10, 2), nullable=False)
+    quantity = db.Column(db.Integer, default=1)
+    description = db.Column(db.Text)
+    status = db.Column(db.String(20), default='available')  # 'available', 'pending', 'sold'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    farmer = db.relationship('User', backref='animals')
-    
     def to_dict(self):
+        """Convert animal to dictionary"""
         return {
             'id': self.id,
-            'title': self.title,
-            'type': self.type,
-            'breed': self.breed,
-            'age_months': self.age_months,
-            'price_per_unit': float(self.price_per_unit),
-            'quantity_available': self.quantity_available,
-            'images': self.images or [],
-            'county': self.county,
-            'status': self.status,
             'farmer_id': self.farmer_id,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
+            'title': self.title,
+            'animal_type': self.animal_type,
+            'breed': self.breed,
+            'age': self.age,
+            'price': float(self.price) if self.price else None,
+            'quantity': self.quantity,
+            'description': self.description,
+            'status': self.status,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+    
+    def __repr__(self):
+        return f'<Animal {self.title}>'

@@ -1,40 +1,55 @@
-import os
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from flask_cors import CORS
 from flask_jwt_extended import JWTManager
-from dotenv import load_dotenv
+from app.models import db
+from app.routes.orders import orders_bp
+from config import config
+import os
 
-load_dotenv()
 
-db = SQLAlchemy()
-migrate = Migrate()
-jwt = JWTManager()
-
-def create_app():
+def create_app(config_name=None):
+    """
+    Application factory function
+    
+    Args:
+        config_name (str): Configuration name (development, testing, production)
+    
+    Returns:
+        Flask: Configured Flask application instance
+    """
+    if config_name is None:
+        config_name = os.environ.get('FLASK_ENV', 'default')
+    
     app = Flask(__name__)
+    app.config.from_object(config[config_name])
     
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
-    app.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'uploads')
-    app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
-    
+    # Initialize extensions
     db.init_app(app)
-    migrate.init_app(app, db)
-    jwt.init_app(app)
-    CORS(app)
+    JWTManager(app)
     
-    from app.models.user import User
-    from app.models.animal import Animal
+    # Register blueprints
+    app.register_blueprint(orders_bp)
     
-    from app.routes.animals import animals_bp
-    from app.routes.auth import auth_bp
-    app.register_blueprint(animals_bp)
-    app.register_blueprint(auth_bp)
+    # Create database tables
+    with app.app_context():
+        db.create_all()
     
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'animals'), exist_ok=True)
+    # Register error handlers
+    register_error_handlers(app)
     
     return app
+
+
+def register_error_handlers(app):
+    """Register custom error handlers"""
+    
+    @app.errorhandler(404)
+    def not_found(error):
+        return {'error': 'Resource not found'}, 404
+    
+    @app.errorhandler(500)
+    def internal_error(error):
+        return {'error': 'Internal server error'}, 500
+    
+    @app.errorhandler(400)
+    def bad_request(error):
+        return {'error': 'Bad request'}, 400
