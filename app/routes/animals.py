@@ -4,6 +4,7 @@ from app import db
 from app.models.animal import Animal
 from app.models.user import User
 from app.models.order import OrderItem, Order
+from app.utils.cloudinary_helper import upload_image, delete_image
 
 animals_bp = Blueprint('animals', __name__)
 
@@ -76,21 +77,21 @@ def get_animal(id):
 @animals_bp.route('', methods=['POST'])
 @jwt_required()
 def create_animal():
-    """
-    Create a new animal listing (farmers only)
-    """
+    """Create a new animal listing (farmers only)"""
     identity = get_jwt_identity()
     try:
         user_id = int(identity)
     except (TypeError, ValueError):
         return jsonify({'message': 'Invalid token identity'}), 422
-    data = request.get_json()
 
     user = User.query.get(user_id)
     if not user:
         return jsonify({'message': 'User not found'}), 404
     if user.role != 'farmer':
         return jsonify({'message': 'Only farmers can create listings'}), 403
+
+    data = request.form.to_dict()
+    image_file = request.files.get('image')
 
     if not data:
         return jsonify({'message': 'No data provided'}), 400
@@ -113,11 +114,19 @@ def create_animal():
         return jsonify({'message': 'quantity must be an integer'}), 400
 
     age = data.get('age')
-    if age is not None:
+    if age is not None and age != '':
         try:
             age = int(age)
         except (TypeError, ValueError):
             return jsonify({'message': 'age must be an integer'}), 400
+    else:
+        age = None
+    
+    image_url = data.get('image_url') or None
+    if image_file:
+        image_url, error = upload_image(image_file)
+        if error:
+            return jsonify({'message': f'Image upload failed: {error}'}), 400
     
     animal = Animal(
         farmer_id=user_id,
@@ -127,7 +136,8 @@ def create_animal():
         age=age,
         price=price,
         quantity=quantity,
-        description=data.get('description')
+        description=data.get('description'),
+        image_url=image_url
     )
     
     db.session.add(animal)
@@ -139,16 +149,14 @@ def create_animal():
 @animals_bp.route('/<int:id>', methods=['PUT'])
 @jwt_required()
 def update_animal(id):
-    """
-    Update animal listing (owner only)
-    """
+    """Update animal listing (owner only)"""
     identity = get_jwt_identity()
     try:
         user_id = int(identity)
     except (TypeError, ValueError):
         return jsonify({'message': 'Invalid token identity'}), 422
-    animal = Animal.query.get(id)
     
+    animal = Animal.query.get(id)
     if not animal:
         return jsonify({'message': 'Animal not found'}), 404
 
@@ -160,8 +168,10 @@ def update_animal(id):
     if animal.farmer_id != user_id:
         return jsonify({'message': 'You do not own this animal'}), 403
     
-    data = request.get_json()
-    if not data:
+    data = request.form.to_dict()
+    image_file = request.files.get('image')
+    
+    if not data and not image_file:
         return jsonify({'message': 'No data provided'}), 400
 
     if 'title' in data:
@@ -172,9 +182,11 @@ def update_animal(id):
         animal.breed = data.get('breed')
     if 'description' in data:
         animal.description = data.get('description')
+    if 'image_url' in data and data.get('image_url'):
+        animal.image_url = data.get('image_url')
     if 'age' in data:
         try:
-            animal.age = int(data.get('age')) if data.get('age') is not None else None
+            animal.age = int(data.get('age')) if data.get('age') not in [None, ''] else None
         except (TypeError, ValueError):
             return jsonify({'message': 'age must be an integer'}), 400
     if 'price' in data:
@@ -193,6 +205,14 @@ def update_animal(id):
     if 'status' in data:
         animal.status = data.get('status')
     
+    if image_file:
+        if animal.image_url:
+            delete_image(animal.image_url)
+        image_url, error = upload_image(image_file)
+        if error:
+            return jsonify({'message': f'Image upload failed: {error}'}), 400
+        animal.image_url = image_url
+    
     db.session.commit()
     return jsonify(animal.to_dict()), 200
 
@@ -200,16 +220,14 @@ def update_animal(id):
 @animals_bp.route('/<int:id>', methods=['DELETE'])
 @jwt_required()
 def delete_animal(id):
-    """
-    Delete animal listing (owner only)
-    """
+    """Delete animal listing (owner only)"""
     identity = get_jwt_identity()
     try:
         user_id = int(identity)
     except (TypeError, ValueError):
         return jsonify({'message': 'Invalid token identity'}), 422
-    animal = Animal.query.get(id)
     
+    animal = Animal.query.get(id)
     if not animal:
         return jsonify({'message': 'Animal not found'}), 404
 
@@ -230,7 +248,8 @@ def delete_animal(id):
     if any_order_exists:
         return jsonify({'message': 'Cannot delete animal that is in an order'}), 409
     
-    # TODO: Verify ownership
+    if animal.image_url:
+        delete_image(animal.image_url)
     
     db.session.delete(animal)
     db.session.commit()

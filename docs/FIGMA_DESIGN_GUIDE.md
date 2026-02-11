@@ -6,7 +6,7 @@
 
 ---
 
-## 🎨 Color Scheme (Farm-Friendly & Professional)
+##  Color Scheme (Farm-Friendly & Professional)
 
 ### Primary Colors
 ```
@@ -42,7 +42,7 @@ Info: #3B82F6 (blue) - General info
 
 ---
 
-## 📱 Pages You Need to Design (12 Total)
+##  Pages You Need to Design (12 Total)
 
 ### 1. Authentication Pages (2 pages)
 
@@ -311,7 +311,7 @@ Info: #3B82F6 (blue) - General info
 
 ---
 
-## 🎯 Design System Components
+##  Design System Components
 
 Create these reusable components in Figma:
 
@@ -357,7 +357,7 @@ Create these reusable components in Figma:
 
 ---
 
-## 📐 Layout Guidelines
+##  Layout Guidelines
 
 ### Typography
 ```
@@ -387,7 +387,7 @@ Body:
 
 ---
 
-## 🚀 How to Create in Figma
+##  How to Create in Figma
 
 ### Step 1: Setup Frame
 1. Create new file: "Farmart Wireframes"
@@ -426,7 +426,7 @@ Body:
 
 ---
 
-## ✅ Quick Checklist
+##  Quick Checklist
 
 **Must Have (Essential):**
 - [ ] 2 Auth pages (Login, Register)
@@ -449,15 +449,15 @@ Body:
 - [ ] Image placeholders with actual images
 
 **Don't Worry About:**
-- ❌ Pixel-perfect designs
-- ❌ Custom illustrations
-- ❌ Animations
-- ❌ Every possible edge case
-- ❌ Making it look like a real product
+-  Pixel-perfect designs
+-  Custom illustrations
+-  Animations
+-  Every possible edge case
+-  Making it look like a real product
 
 ---
 
-## 💡 Pro Tips
+##  Pro Tips
 
 1. **Keep it simple** - Boxes and text are fine!
 2. **Use real content** - "Dairy Cow - $500" not "Lorem ipsum"
@@ -469,35 +469,35 @@ Body:
 
 ---
 
-## 📋 Your Action Plan
+##  Your Action Plan
 
 ### Tonight (30-45 minutes):
-1. ✅ Create Figma file
-2. ✅ Set up color styles
-3. ✅ Design Login page (start simple!)
-4. ✅ Design Register page (copy Login, modify)
+1.  Create Figma file
+2.  Set up color styles
+3.  Design Login page (start simple!)
+4.  Design Register page (copy Login, modify)
 
 ### Tomorrow (1 hour):
-5. ✅ Design Animals List page
-6. ✅ Design Animal Detail page
-7. ✅ Design Cart page
+5.  Design Animals List page
+6.  Design Animal Detail page
+7.  Design Cart page
 
 ### Day After (1 hour):
-8. ✅ Design Checkout page
-9. ✅ Design Order History page
-10. ✅ Design Farmer Orders page
-11. ✅ Create Create/Edit Animal pages
+8.  Design Checkout page
+9.  Design Order History page
+10.  Design Farmer Orders page
+11.  Create Create/Edit Animal pages
 
 ### Final (30 min):
-12. ✅ Review all pages
-13. ✅ Make sure colors are consistent
-14. ✅ Share link with team
+12.  Review all pages
+13.  Make sure colors are consistent
+14.  Share link with team
 
 ---
 
-## 🎨 Sample Prompts (If Using AI Design Tools)
+## Sample Prompts (If Using Design Tools)
 
-If you want to generate design inspiration or use AI:
+If you want to generate design inspiration:
 
 **For Login Page:**
 ```
@@ -523,23 +523,23 @@ and checkout button. Green color scheme."
 
 ---
 
-## 📸 Share with Team
+##  Share with Team
 
 Once done, share in group chat:
 
 ```
-🎨 FIGMA WIREFRAMES READY!
+FIGMA WIREFRAMES READY!
 
 Hi team! I've created wireframes for all our pages:
 
 [Figma Link]
 
 **What's included:**
-✅ Login & Register
-✅ Animals List, Detail, Create, Edit
-✅ Shopping Cart
-✅ Checkout & Orders
-✅ Farmer Dashboard
+- Login & Register
+- Animals List, Detail, Create, Edit
+- Shopping Cart
+- Checkout & Orders
+- Farmer Dashboard
 
 **Color Scheme:**
 - Primary: Green (#10B981)
@@ -549,9 +549,9 @@ Hi team! I've created wireframes for all our pages:
 These are wireframes (blueprints), not final designs. 
 Use them as reference for building your features!
 
-Questions? Let me know! 🚀
+Questions? Let me know!
 ```
 
 ---
 
-**Remember:** Your team needs clarity, not perfection. Show them WHAT to build, not how pretty it should be. You've got this! 🌟
+**Remember:** Your team needs clarity, not perfection. Show them WHAT to build, not how pretty it should be. You've got this!

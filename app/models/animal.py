@@ -14,7 +14,8 @@ class Animal(db.Model):
     price = db.Column(db.Numeric(10, 2), nullable=False)
     quantity = db.Column(db.Integer, default=1)
     description = db.Column(db.Text)
-    status = db.Column(db.String(20), default='available')  # 'available', 'pending', 'sold'
+    image_url = db.Column(db.String(500))
+    status = db.Column(db.String(20), default='available')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -35,6 +36,7 @@ class Animal(db.Model):
             'price': float(self.price) if self.price else None,
             'quantity': self.quantity,
             'description': self.description,
+            'image_url': self.image_url,
             'status': self.status,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None

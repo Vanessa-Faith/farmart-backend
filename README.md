@@ -124,7 +124,7 @@ curl -X POST http://localhost:5000/api/orders \
 }
 ```
 
-## 🗄️ Database Schema
+##  Database Schema
 
 ### Core Models
 
@@ -250,7 +250,7 @@ Tests should be added to the `tests/` directory following pytest conventions.
 5. Run the test suite (`pytest`)
 6. Submit a pull request
 
-## 🚀 Deployment
+##  Deployment
 
 ### Production Requirements
 - Python 3.8+

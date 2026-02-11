@@ -1,12 +1,3 @@
-"""
-Order management routes for FarmArt Backend Application
-
-This module handles all order-related API endpoints including:
-- Order creation and retrieval
-- Payment processing
-- Order confirmation and rejection
-- Authorization and validation
-"""
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
@@ -16,15 +7,13 @@ from app.models.cart import Cart
 from app.models.animal import Animal
 from app.models.user import User
 
-orders_bp = Blueprint("orders", __name__, url_prefix="/api/orders")
+orders_bp = Blueprint('orders', __name__)
 
 
-@orders_bp.route("", methods=["GET"])
+@orders_bp.route('', methods=['GET'])
 @jwt_required()
 def get_orders():
-    """
-    Get user's orders (buyer sees their purchases, farmer sees orders for their animals)
-    """
+    """Get user's orders (buyer sees their purchases, farmer sees orders for their animals)"""
     identity = get_jwt_identity()
     try:
         user_id = int(identity)
@@ -45,48 +34,21 @@ def get_orders():
         )
     else:
         orders = Order.query.filter_by(buyer_id=user_id).all()
-    
-    Raises:
-        404: User not found
-        200: Success with orders list
-    """
-    try:
-        user_id = get_jwt_identity()
-        user = User.query.get_or_404(user_id, description="User not found")
-        
-        logger.info(f"User {user.username} ({user.role}) requesting orders")
-        
-        if user.role == "buyer":
-            orders = Order.query.filter_by(buyer_id=user_id).all()
-        else:
-            orders = (
-                Order.query.join(OrderItem)
-                .filter(OrderItem.farmer_id == user_id)
-                .distinct()
-                .all()
-            )
-        
-        logger.info(f"Found {len(orders)} orders for user {user.username}")
-        return jsonify([order.to_dict() for order in orders]), 200
-        
-    except Exception as e:
-        logger.error(f"Error retrieving orders for user {user_id}: {str(e)}")
-        return jsonify({"error": "Failed to retrieve orders"}), 500
+
+    return jsonify([order.to_dict() for order in orders]), 200
 
 
-@orders_bp.route("/<int:order_id>", methods=["GET"])
+@orders_bp.route('/<int:id>', methods=['GET'])
 @jwt_required()
 def get_order(id):
-    """
-    Get single order details
-    """
+    """Get single order details"""
     identity = get_jwt_identity()
     try:
         user_id = int(identity)
     except (TypeError, ValueError):
         return jsonify({'message': 'Invalid token identity'}), 422
-    order = Order.query.get(id)
     
+    order = Order.query.get(id)
     if not order:
         return jsonify({'message': 'Order not found'}), 404
 
@@ -105,12 +67,10 @@ def get_order(id):
     return jsonify(order.to_dict()), 200
 
 
-@orders_bp.route("", methods=["POST"])
+@orders_bp.route('', methods=['POST'])
 @jwt_required()
 def create_order():
-    """
-    Create order from cart
-    """
+    """Create order from cart"""
     identity = get_jwt_identity()
     try:
         user_id = int(identity)
@@ -173,162 +133,18 @@ def create_order():
     db.session.commit()
     return jsonify(order.to_dict()), 201
 
-        db.session.commit()
-        
-        logger.info(f"Order {order.id} created successfully for user {user.username}, total value: KSh {total_value}")
-        return jsonify(order.to_dict()), 201
 
-    except IntegrityError as e:
-        db.session.rollback()
-        logger.error(f"Database integrity error creating order: {str(e)}")
-        return jsonify({"error": "Database constraint violation"}), 400
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        logger.error(f"Database error creating order: {str(e)}")
-        return jsonify({"error": "Database operation failed"}), 500
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Unexpected error creating order: {str(e)}")
-        return jsonify({"error": "An unexpected error occurred"}), 500
-
-
-@orders_bp.route("/<int:order_id>/pay", methods=["POST"])
-@jwt_required()
-def confirm_order(id):
-    """
-    Farmer confirms order
-    """
-    identity = get_jwt_identity()
-    try:
-        user_id = int(identity)
-    except (TypeError, ValueError):
-        return jsonify({'message': 'Invalid token identity'}), 422
-
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'message': 'User not found'}), 404
-    if user.role != 'farmer':
-        return jsonify({'message': 'Only farmers can confirm orders'}), 403
-
-    order = Order.query.get(id)
-    if not order:
-        return jsonify({'message': 'Order not found'}), 404
-
-    if not order.items or any(item.farmer_id != user_id for item in order.items):
-        return jsonify({'message': 'Access denied'}), 403
-
-    if order.status in ['rejected', 'paid']:
-        return jsonify({'message': 'Order cannot be confirmed'}), 400
-
-    order.status = 'confirmed'
-    db.session.commit()
-
-    return jsonify({'message': 'Order confirmed'}), 200
-
-        # Authorization check
-        if order.buyer_id != user_id:
-            logger.warning(f"Unauthorized payment attempt: user {user_id} for order {order_id}")
-            return jsonify({"error": "Unauthorized"}), 403
-
-        # State validation
-        if order.status != "pending":
-            logger.warning(f"Invalid payment attempt: order {order_id} is {order.status}, not pending")
-            return jsonify({"error": f"Cannot pay for order in '{order.status}' status"}), 400
-
-        logger.info(f"Processing payment for order {order_id} by user {user_id}")
-        
-        order.status = "paid"
-        db.session.commit()
-        
-        logger.info(f"Order {order_id} marked as paid")
-        return jsonify({"message": "Payment successful"}), 200
-        
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        logger.error(f"Database error processing payment for order {order_id}: {str(e)}")
-        return jsonify({"error": "Payment processing failed"}), 500
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Unexpected error processing payment for order {order_id}: {str(e)}")
-        return jsonify({"error": "An unexpected error occurred"}), 500
-
-
-@orders_bp.route("/<int:order_id>/confirm", methods=["POST"])
-@jwt_required()
-def confirm_order(order_id):
-    """
-    Farmer rejects order
-    """
-    identity = get_jwt_identity()
-    try:
-        user_id = int(identity)
-    except (TypeError, ValueError):
-        return jsonify({'message': 'Invalid token identity'}), 422
-
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'message': 'User not found'}), 404
-    if user.role != 'farmer':
-        return jsonify({'message': 'Only farmers can reject orders'}), 403
-
-    order = Order.query.get(id)
-    if not order:
-        return jsonify({'message': 'Order not found'}), 404
-
-    if not order.items or any(item.farmer_id != user_id for item in order.items):
-        return jsonify({'message': 'Access denied'}), 403
-
-    if order.status in ['rejected', 'paid']:
-        return jsonify({'message': 'Order cannot be rejected'}), 400
-
-    order.status = 'rejected'
-
-    for item in order.items:
-        animal = Animal.query.get(item.animal_id)
-        if animal and animal.quantity is not None:
-            animal.quantity += item.quantity
-            if animal.quantity > 0:
-                animal.status = 'available'
-
-    db.session.commit()
-
-    return jsonify({'message': 'Order rejected'}), 200
-
-        # Authorization check
-        if not any(item.farmer_id == user_id for item in order.items):
-            logger.warning(f"Unauthorized confirmation attempt: user {user_id} for order {order_id}")
-            return jsonify({"error": "Unauthorized"}), 403
-
-        logger.info(f"Confirming order {order_id} by farmer {user_id}")
-        
-        order.status = "confirmed"
-        db.session.commit()
-        
-        logger.info(f"Order {order_id} confirmed successfully")
-        return jsonify({"message": "Order confirmed"}), 200
-        
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        logger.error(f"Database error confirming order {order_id}: {str(e)}")
-        return jsonify({"error": "Order confirmation failed"}), 500
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Unexpected error confirming order {order_id}: {str(e)}")
-        return jsonify({"error": "An unexpected error occurred"}), 500
-
-
-@orders_bp.route("/<int:order_id>/reject", methods=["POST"])
+@orders_bp.route('/<int:id>/pay', methods=['POST'])
 @jwt_required()
 def pay_order(id):
-    """
-    Process payment for order
-    """
+    """Process payment for order"""
     identity = get_jwt_identity()
     try:
         user_id = int(identity)
     except (TypeError, ValueError):
         return jsonify({'message': 'Invalid token identity'}), 422
-    data = request.get_json()
+    
+    data = request.get_json(silent=True)
 
     user = User.query.get(user_id)
     if not user:
@@ -368,3 +184,124 @@ def pay_order(id):
     db.session.commit()
 
     return jsonify({'message': 'Payment processed', 'payment': payment.to_dict(), 'order': order.to_dict()}), 200
+
+
+@orders_bp.route('/<int:id>/confirm', methods=['POST'])
+@jwt_required()
+def confirm_order(id):
+    """Farmer confirms order"""
+    identity = get_jwt_identity()
+    try:
+        user_id = int(identity)
+    except (TypeError, ValueError):
+        return jsonify({'message': 'Invalid token identity'}), 422
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    if user.role != 'farmer':
+        return jsonify({'message': 'Only farmers can confirm orders'}), 403
+
+    order = Order.query.get(id)
+    if not order:
+        return jsonify({'message': 'Order not found'}), 404
+
+    if not order.items or not any(item.farmer_id == user_id for item in order.items):
+        return jsonify({'message': 'Access denied'}), 403
+
+    if order.status in ['rejected', 'confirmed']:
+        return jsonify({'message': 'Order cannot be confirmed'}), 400
+
+    order.status = 'confirmed'
+    db.session.commit()
+
+    return jsonify({'message': 'Order confirmed', 'order': order.to_dict()}), 200
+
+
+@orders_bp.route('/<int:id>/reject', methods=['POST'])
+@jwt_required()
+def reject_order(id):
+    """Farmer rejects order"""
+    identity = get_jwt_identity()
+    try:
+        user_id = int(identity)
+    except (TypeError, ValueError):
+        return jsonify({'message': 'Invalid token identity'}), 422
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    if user.role != 'farmer':
+        return jsonify({'message': 'Only farmers can reject orders'}), 403
+
+    order = Order.query.get(id)
+    if not order:
+        return jsonify({'message': 'Order not found'}), 404
+
+    if not order.items or not any(item.farmer_id == user_id for item in order.items):
+        return jsonify({'message': 'Access denied'}), 403
+
+    if order.status in ['rejected', 'confirmed']:
+        return jsonify({'message': 'Order cannot be rejected'}), 400
+
+    order.status = 'rejected'
+
+    for item in order.items:
+        animal = Animal.query.get(item.animal_id)
+        if animal and animal.quantity is not None:
+            animal.quantity += item.quantity
+            if animal.quantity > 0:
+                animal.status = 'available'
+
+    db.session.commit()
+
+    return jsonify({'message': 'Order rejected', 'order': order.to_dict()}), 200
+
+
+@orders_bp.route('/<int:id>', methods=['PUT'])
+@jwt_required()
+def update_order(id):
+    """Update order status (farmer: confirm/reject)"""
+    identity = get_jwt_identity()
+    try:
+        user_id = int(identity)
+    except (TypeError, ValueError):
+        return jsonify({'message': 'Invalid token identity'}), 422
+
+    data = request.get_json(silent=True)
+    if not data or 'status' not in data:
+        return jsonify({'message': 'Status is required'}), 400
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    if user.role != 'farmer':
+        return jsonify({'message': 'Only farmers can update order status'}), 403
+
+    order = Order.query.get(id)
+    if not order:
+        return jsonify({'message': 'Order not found'}), 404
+
+    if not order.items or not any(item.farmer_id == user_id for item in order.items):
+        return jsonify({'message': 'Access denied'}), 403
+
+    new_status = data.get('status')
+    if new_status not in ['confirmed', 'rejected']:
+        return jsonify({'message': 'Invalid status. Must be confirmed or rejected'}), 400
+
+    if order.status in ['rejected', 'confirmed']:
+        return jsonify({'message': 'Order already finalized'}), 400
+
+    order.status = new_status
+
+    if new_status == 'rejected':
+        for item in order.items:
+            animal = Animal.query.get(item.animal_id)
+            if animal and animal.quantity is not None:
+                animal.quantity += item.quantity
+                if animal.quantity > 0:
+                    animal.status = 'available'
+
+    db.session.commit()
+
+    return jsonify({'message': f'Order {new_status}', 'order': order.to_dict()}), 200
