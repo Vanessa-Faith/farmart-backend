@@ -1,6 +1,3 @@
-"""
-Database models for FarmArt Backend Application
-"""
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from sqlalchemy.orm import validates
@@ -9,14 +6,6 @@ db = SQLAlchemy()
 
 
 class User(db.Model):
-    """
-    User model representing buyers and farmers
-    
-    Attributes:
-        id (int): Unique identifier
-        username (str): Unique username
-        role (str): User role (buyer or farmer)
-    """
     __tablename__ = 'user'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -29,7 +18,6 @@ class User(db.Model):
     
     @validates('role')
     def validate_role(self, key, role):
-        """Validate that role is either 'buyer' or 'farmer'"""
         if role not in ['buyer', 'farmer']:
             raise ValueError("Role must be either 'buyer' or 'farmer'")
         return role
@@ -39,16 +27,6 @@ class User(db.Model):
 
 
 class Animal(db.Model):
-    """
-    Animal model representing livestock available for sale
-    
-    Attributes:
-        id (int): Unique identifier
-        name (str): Animal name/breed
-        farmer_id (int): Foreign key to User (farmer)
-        available (bool): Availability status
-        price (float): Price in Kenyan Shillings
-    """
     __tablename__ = 'animal'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -60,7 +38,6 @@ class Animal(db.Model):
     
     @validates('price')
     def validate_price(self, key, price):
-        """Validate that price is positive"""
         if price <= 0:
             raise ValueError("Price must be positive")
         return price
@@ -70,28 +47,30 @@ class Animal(db.Model):
 
 
 class Order(db.Model):
-    """
-    Order model representing purchase orders
-    
-    Attributes:
-        id (int): Unique identifier
-        buyer_id (int): Foreign key to User (buyer)
-        status (str): Order status (pending, paid, confirmed, rejected)
-        created_at (datetime): Order creation timestamp
-    """
     __tablename__ = 'order'
     
     id = db.Column(db.Integer, primary_key=True)
     buyer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     status = db.Column(db.String(20), default='pending', index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    # M-Pesa payment fields
+    mpesa_merchant_request_id = db.Column(db.String(100), index=True)
+    mpesa_checkout_request_id = db.Column(db.String(100), index=True, unique=False)
+    mpesa_result_code = db.Column(db.Integer, index=True)
+    mpesa_result_desc = db.Column(db.String(255))
+    mpesa_receipt_number = db.Column(db.String(50), index=True)
+    mpesa_transaction_date = db.Column(db.DateTime)
+    mpesa_phone_number = db.Column(db.String(20))
+    mpesa_amount = db.Column(db.Float)
+    mpesa_callback_raw = db.Column(db.Text)
+    mpesa_request_sent_at = db.Column(db.DateTime)
     
     # Relationships
     items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
     
     @validates('status')
     def validate_status(self, key, status):
-        """Validate order status"""
         valid_statuses = ['pending', 'paid', 'confirmed', 'rejected']
         if status not in valid_statuses:
             raise ValueError(f"Status must be one of: {', '.join(valid_statuses)}")
@@ -104,7 +83,18 @@ class Order(db.Model):
             'buyer_id': self.buyer_id,
             'status': self.status,
             'created_at': self.created_at.isoformat(),
-            'items': [item.to_dict() for item in self.items]
+            'items': [item.to_dict() for item in self.items],
+            'payment': {
+                'mpesa_checkout_request_id': self.mpesa_checkout_request_id,
+                'mpesa_receipt_number': self.mpesa_receipt_number,
+                'mpesa_result_code': self.mpesa_result_code,
+                'mpesa_result_desc': self.mpesa_result_desc,
+                'mpesa_amount': self.mpesa_amount,
+                'mpesa_phone_number': self.mpesa_phone_number,
+                'mpesa_transaction_date': (
+                    self.mpesa_transaction_date.isoformat() if self.mpesa_transaction_date else None
+                ),
+            }
         }
     
     def __repr__(self):
@@ -112,16 +102,6 @@ class Order(db.Model):
 
 
 class OrderItem(db.Model):
-    """
-    OrderItem model representing items within an order
-    
-    Attributes:
-        id (int): Unique identifier
-        order_id (int): Foreign key to Order
-        animal_id (int): Foreign key to Animal
-        farmer_id (int): Foreign key to User (farmer)
-        quantity (int): Quantity of animals ordered
-    """
     __tablename__ = 'order_item'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -132,7 +112,6 @@ class OrderItem(db.Model):
     
     @validates('quantity')
     def validate_quantity(self, key, quantity):
-        """Validate that quantity is positive"""
         if quantity <= 0:
             raise ValueError("Quantity must be positive")
         return quantity

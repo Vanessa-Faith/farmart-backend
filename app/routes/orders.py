@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+<<<<<<< HEAD
 from app import db
 from app.models.order import Order, OrderItem
 from app.models.payment import Payment
@@ -11,6 +12,57 @@ orders_bp = Blueprint('orders', __name__)
 
 
 @orders_bp.route('', methods=['GET'])
+=======
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy import func
+import logging
+import json
+from datetime import datetime
+
+from app.models import db, Order, OrderItem, Animal, User
+from app.services.mpesa import send_stk_push, MpesaError
+
+logger = logging.getLogger(__name__)
+orders_bp = Blueprint("orders", __name__, url_prefix="/api/orders")
+
+
+def _normalize_phone_number(phone_number):
+    """Normalize Kenyan phone numbers to 2547XXXXXXXX format."""
+    if not phone_number:
+        return None
+    raw = phone_number.strip().replace(" ", "")
+    if raw.startswith("+"):
+        raw = raw[1:]
+    if raw.startswith("0"):
+        raw = "254" + raw[1:]
+    if not raw.startswith("254") or len(raw) < 12:
+        return None
+    return raw
+
+
+def _calculate_order_amount(order_id):
+    """Calculate total order amount in KES using current animal prices."""
+    total = (
+        db.session.query(func.sum(Animal.price * OrderItem.quantity))
+        .join(OrderItem, OrderItem.animal_id == Animal.id)
+        .filter(OrderItem.order_id == order_id)
+        .scalar()
+    )
+    return float(total or 0)
+
+
+def _parse_mpesa_callback_items(items):
+    parsed = {}
+    for item in items or []:
+        name = item.get("Name")
+        value = item.get("Value")
+        if name:
+            parsed[name] = value
+    return parsed
+
+
+@orders_bp.route("", methods=["GET"])
+>>>>>>> ce230761465cc6fabc28f399185c8b503eaceaaf
 @jwt_required()
 def get_orders():
     """Get user's orders (buyer sees their purchases, farmer sees orders for their animals)"""
@@ -136,9 +188,36 @@ def create_order():
 
 @orders_bp.route('/<int:id>/pay', methods=['POST'])
 @jwt_required()
+<<<<<<< HEAD
 def pay_order(id):
     """Process payment for order"""
     identity = get_jwt_identity()
+=======
+def pay_order(order_id):
+    """
+    Initiate M-Pesa STK Push for an order.
+    
+    Only the buyer who created the order can pay for it.
+    Order must be in 'pending' status.
+    
+    Args:
+        order_id (int): The ID of the order to pay for
+    
+    Request Body:
+        {
+            "phone_number": "07XXXXXXXX" or "2547XXXXXXXX"
+        }
+
+    Returns:
+        JSON response with STK Push initiation details
+    
+    Raises:
+        404: Order not found
+        403: Unauthorized payment attempt
+        400: Invalid order state for payment
+        200: STK Push initiated
+    """
+>>>>>>> ce230761465cc6fabc28f399185c8b503eaceaaf
     try:
         user_id = int(identity)
     except (TypeError, ValueError):
@@ -156,6 +235,7 @@ def pay_order(id):
     if not order:
         return jsonify({'message': 'Order not found'}), 404
 
+<<<<<<< HEAD
     if order.buyer_id != user_id:
         return jsonify({'message': 'Access denied'}), 403
 
@@ -187,6 +267,123 @@ def pay_order(id):
 
 
 @orders_bp.route('/<int:id>/confirm', methods=['POST'])
+=======
+        logger.info(f"Processing payment for order {order_id} by user {user_id}")
+
+        if order.mpesa_checkout_request_id and order.mpesa_result_code is None:
+            return jsonify({"error": "Payment already initiated. Please wait for confirmation."}), 409
+
+        data = request.get_json() or {}
+        phone_number = _normalize_phone_number(data.get("phone_number"))
+        if not phone_number:
+            return jsonify({"error": "Valid Kenyan phone_number is required"}), 400
+
+        amount = _calculate_order_amount(order.id)
+        if amount <= 0:
+            return jsonify({"error": "Order total is invalid"}), 400
+
+        response = send_stk_push(
+            amount=round(amount),
+            phone_number=phone_number,
+            account_reference=f"ORDER-{order.id}",
+            transaction_desc=f"Payment for Order {order.id}",
+        )
+
+        # Expected success fields for STK Push
+        if response.get("ResponseCode") != "0":
+            logger.error(f"STK Push failed for order {order.id}: {response}")
+            return jsonify({"error": "STK Push failed", "details": response}), 400
+
+        order.mpesa_merchant_request_id = response.get("MerchantRequestID")
+        order.mpesa_checkout_request_id = response.get("CheckoutRequestID")
+        order.mpesa_request_sent_at = datetime.utcnow()
+        order.mpesa_phone_number = phone_number
+        order.mpesa_amount = round(amount)
+        order.mpesa_result_code = None
+        order.mpesa_result_desc = response.get("ResponseDescription")
+        db.session.commit()
+
+        logger.info(f"STK Push initiated for order {order_id}")
+        return jsonify({
+            "message": "STK Push sent. Enter PIN on your phone to complete payment.",
+            "checkout_request_id": order.mpesa_checkout_request_id,
+            "merchant_request_id": order.mpesa_merchant_request_id,
+        }), 200
+        
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        logger.error(f"Database error processing payment for order {order_id}: {str(e)}")
+        return jsonify({"error": "Payment processing failed"}), 500
+    except MpesaError as e:
+        db.session.rollback()
+        logger.error(f"M-Pesa error processing payment for order {order_id}: {str(e)}")
+        return jsonify({"error": "M-Pesa request failed", "details": str(e)}), 502
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Unexpected error processing payment for order {order_id}: {str(e)}")
+        return jsonify({"error": "An unexpected error occurred"}), 500
+
+
+@orders_bp.route("/mpesa/callback", methods=["POST"])
+def mpesa_callback():
+    """
+    Handle M-Pesa STK Push callback.
+
+    This endpoint is called by Safaricom after the customer approves or rejects the payment.
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        callback = payload.get("Body", {}).get("stkCallback", {})
+        checkout_request_id = callback.get("CheckoutRequestID")
+
+        if not checkout_request_id:
+            logger.warning(f"Invalid M-Pesa callback payload: {payload}")
+            return jsonify({"ResultCode": 1, "ResultDesc": "Invalid callback"}), 400
+
+        order = Order.query.filter_by(mpesa_checkout_request_id=checkout_request_id).first()
+        if not order:
+            logger.error(f"No order matches CheckoutRequestID {checkout_request_id}")
+            return jsonify({"ResultCode": 0, "ResultDesc": "Accepted"}), 200
+
+        result_code = callback.get("ResultCode")
+        result_desc = callback.get("ResultDesc")
+        order.mpesa_result_code = int(result_code) if result_code is not None else None
+        order.mpesa_result_desc = result_desc
+        order.mpesa_callback_raw = json.dumps(payload)
+
+        if order.mpesa_result_code == 0:
+            items = _parse_mpesa_callback_items(
+                callback.get("CallbackMetadata", {}).get("Item", [])
+            )
+            order.mpesa_amount = items.get("Amount", order.mpesa_amount)
+            order.mpesa_receipt_number = items.get("MpesaReceiptNumber")
+            order.mpesa_phone_number = items.get("PhoneNumber", order.mpesa_phone_number)
+
+            txn_date = items.get("TransactionDate")
+            if txn_date:
+                try:
+                    order.mpesa_transaction_date = datetime.strptime(str(txn_date), "%Y%m%d%H%M%S")
+                except ValueError:
+                    logger.warning(f"Invalid transaction date in callback: {txn_date}")
+
+            # Only mark as paid after successful confirmation
+            order.status = "paid"
+
+        db.session.commit()
+        return jsonify({"ResultCode": 0, "ResultDesc": "Accepted"}), 200
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        logger.error(f"Database error handling M-Pesa callback: {str(e)}")
+        return jsonify({"ResultCode": 1, "ResultDesc": "DB error"}), 500
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Unexpected error in M-Pesa callback: {str(e)}")
+        return jsonify({"ResultCode": 1, "ResultDesc": "Server error"}), 500
+
+
+@orders_bp.route("/<int:order_id>/confirm", methods=["POST"])
+>>>>>>> ce230761465cc6fabc28f399185c8b503eaceaaf
 @jwt_required()
 def confirm_order(id):
     """Farmer confirms order"""
