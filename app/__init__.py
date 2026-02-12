@@ -14,7 +14,6 @@ db = SQLAlchemy()
 
 
 def create_app(config_name=None):
-    """Application factory function"""
     if config_name is None:
         config_name = os.environ.get('FLASK_ENV', 'default')
     
@@ -23,7 +22,7 @@ def create_app(config_name=None):
     
     db.init_app(app)
     JWTManager(app)
-    CORS(app, supports_credentials=True, origins=['http://localhost:5173'])
+    CORS(app, supports_credentials=True, origins=['http://localhost:5173', 'http://localhost:5174'])
     
     from app.routes.auth import auth_bp
     from app.routes.animals import animals_bp
@@ -56,7 +55,6 @@ def create_app(config_name=None):
 
 
 def register_error_handlers(app):
-    """Register custom error handlers"""
     
     @app.errorhandler(404)
     def not_found(error):

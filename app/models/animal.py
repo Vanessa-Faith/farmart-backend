@@ -25,7 +25,6 @@ class Animal(db.Model):
             self.status = 'available'
     
     def to_dict(self):
-        """Convert animal to dictionary"""
         return {
             'id': self.id,
             'farmer_id': self.farmer_id,

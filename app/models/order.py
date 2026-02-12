@@ -22,7 +22,6 @@ class Order(db.Model):
             self.status = 'pending'
     
     def to_dict(self):
-        """Convert order to dictionary"""
         return {
             'id': self.id,
             'buyer_id': self.buyer_id,
@@ -46,18 +45,21 @@ class OrderItem(db.Model):
     farmer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    animal_image_url = db.Column(db.String(500))
     
     # Relationships
     animal = db.relationship('Animal', backref='order_items')
     farmer = db.relationship('User', foreign_keys=[farmer_id])
     
     def to_dict(self):
-        """Convert order item to dictionary"""
+        animal_dict = self.animal.to_dict() if self.animal else None
+        if animal_dict and self.animal_image_url:
+            animal_dict['image_url'] = self.animal_image_url
         return {
             'id': self.id,
             'order_id': self.order_id,
             'animal_id': self.animal_id,
-            'animal': self.animal.to_dict() if self.animal else None,
+            'animal': animal_dict,
             'farmer_id': self.farmer_id,
             'quantity': self.quantity,
             'unit_price': float(self.unit_price) if self.unit_price else None,
