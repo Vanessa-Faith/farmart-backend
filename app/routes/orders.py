@@ -13,7 +13,14 @@ orders_bp = Blueprint('orders', __name__)
 @orders_bp.route('', methods=['GET'])
 @jwt_required()
 def get_orders():
-    """Get user's orders (buyer sees their purchases, farmer sees orders for their animals)"""
+    """
+    Retrieve all orders for the current user.
+    - Buyers see their own purchases.
+    - Farmers see orders for their animals.
+
+    Returns:
+        Response: JSON list of orders, 200 status code.
+    """
     identity = get_jwt_identity()
     try:
         user_id = int(identity)
@@ -41,7 +48,16 @@ def get_orders():
 @orders_bp.route('/<int:id>', methods=['GET'])
 @jwt_required()
 def get_order(id):
-    """Get single order details"""
+    """
+    Retrieve details for a single order by ID.
+    Only the buyer or the farmer associated with the order can access it.
+
+    Args:
+        id (int): Order ID
+
+    Returns:
+        Response: JSON order details, 200 status code, or error message.
+    """
     identity = get_jwt_identity()
     try:
         user_id = int(identity)
@@ -70,7 +86,13 @@ def get_order(id):
 @orders_bp.route('', methods=['POST'])
 @jwt_required()
 def create_order():
-    """Create order from cart"""
+    """
+    Create a new order from the current user's cart.
+    Only buyers can place orders. Cart must not be empty.
+
+    Returns:
+        Response: JSON order details, 201 status code, or error message.
+    """
     identity = get_jwt_identity()
     try:
         user_id = int(identity)
@@ -137,7 +159,17 @@ def create_order():
 @orders_bp.route('/<int:id>/pay', methods=['POST'])
 @jwt_required()
 def pay_order(id):
-    """Process payment for order"""
+    """
+    Process payment for a specific order.
+    Only the buyer who created the order can pay for it.
+    Order must not be already paid or rejected.
+
+    Args:
+        id (int): Order ID
+
+    Returns:
+        Response: JSON payment and order details, 200 status code, or error message.
+    """
     identity = get_jwt_identity()
     try:
         user_id = int(identity)
@@ -189,7 +221,17 @@ def pay_order(id):
 @orders_bp.route('/<int:id>/confirm', methods=['POST'])
 @jwt_required()
 def confirm_order(id):
-    """Farmer confirms order"""
+    """
+    Confirm an order as a farmer.
+    Only the farmer associated with the order can confirm it.
+    Order must not be already confirmed or rejected.
+
+    Args:
+        id (int): Order ID
+
+    Returns:
+        Response: JSON order details, 200 status code, or error message.
+    """
     identity = get_jwt_identity()
     try:
         user_id = int(identity)
@@ -221,7 +263,17 @@ def confirm_order(id):
 @orders_bp.route('/<int:id>/reject', methods=['POST'])
 @jwt_required()
 def reject_order(id):
-    """Farmer rejects order"""
+    """
+    Reject an order as a farmer.
+    Only the farmer associated with the order can reject it.
+    Order must not be already confirmed or rejected.
+
+    Args:
+        id (int): Order ID
+
+    Returns:
+        Response: JSON order details, 200 status code, or error message.
+    """
     identity = get_jwt_identity()
     try:
         user_id = int(identity)
@@ -261,7 +313,17 @@ def reject_order(id):
 @orders_bp.route('/<int:id>', methods=['PUT'])
 @jwt_required()
 def update_order(id):
-    """Update order status (farmer: confirm/reject)"""
+    """
+    Update the status of an order as a farmer (confirm or reject).
+    Only the farmer associated with the order can update it.
+    Order must not be already finalized.
+
+    Args:
+        id (int): Order ID
+
+    Returns:
+        Response: JSON order details, 200 status code, or error message.
+    """
     identity = get_jwt_identity()
     try:
         user_id = int(identity)

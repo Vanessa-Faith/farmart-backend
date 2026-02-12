@@ -231,12 +231,26 @@ Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTIN
 
 For support, email support@farmart.com or join our Slack channel.
 
+
+## 🙌 Collaborators
+
+This project was built by:
+
+- Linda Jerop
+- Thecla Owano
+- Vanessa Omondi
+- Jonah Tarus
+- Raniel Musyoki
+
+## 📝 Emoji Credits
+
+Emojis used in this README were obtained from [UNICODE emojis](https://unicode.org/emoji/charts/full-emoji-list.html).
+
 ## 🙏 Acknowledgments
 
 - Flask community for the excellent web framework
 - SQLAlchemy team for powerful ORM capabilities
 - All contributors who have helped improve this project
-MIT License
 
 ---
 
