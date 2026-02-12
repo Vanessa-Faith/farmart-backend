@@ -241,8 +241,8 @@ def reject_order(id):
     if not order.items or not any(item.farmer_id == user_id for item in order.items):
         return jsonify({'message': 'Access denied'}), 403
 
-    if order.status in ['rejected', 'confirmed']:
-        return jsonify({'message': 'Order cannot be rejected'}), 400
+    if order.status != 'pending':
+        return jsonify({'message': f"Cannot reject order in '{order.status}' status"}), 400
 
     order.status = 'rejected'
 
