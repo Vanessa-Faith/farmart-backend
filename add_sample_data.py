@@ -10,47 +10,44 @@ def add_sample_data():
         farmer = User.query.filter_by(email="farmer@example.com").first()
         if not farmer:
             farmer = User(
+                name="John Farmer",  # Use 'name' field as per User model
                 email="farmer@example.com",
-                first_name="John",
-                last_name="Farmer",
-                user_type="farmer",
-                phone="+254700000000",
-                county="Nairobi"
+                role="farmer"  # Use 'role' field, not 'user_type'
             )
             farmer.set_password("password123")
             db.session.add(farmer)
             db.session.commit()
         
-        # Add sample animals
+        # Add sample animals with correct field names matching Animal model
         animals_data = [
             {
                 "title": "Premium Holstein Dairy Cow",
-                "type": "cow",
+                "animal_type": "Cow",  # 'animal_type' not 'type'
                 "breed": "Holstein",
-                "age_months": 24,
-                "price_per_unit": 1500.00,
-                "quantity_available": 1,
-                "county": "Nairobi",
+                "age": 24,  # 'age' not 'age_months'
+                "price": 1500.00,  # 'price' not 'price_per_unit'
+                "quantity": 1,  # 'quantity' not 'quantity_available'
+                "description": "High milk production Holstein cow",
                 "farmer_id": farmer.id
             },
             {
                 "title": "Young Angus Bull",
-                "type": "cow",
+                "animal_type": "Cow",
                 "breed": "Angus",
-                "age_months": 18,
-                "price_per_unit": 2000.00,
-                "quantity_available": 1,
-                "county": "Nakuru",
+                "age": 18,
+                "price": 2000.00,
+                "quantity": 1,
+                "description": "Strong breeding bull",
                 "farmer_id": farmer.id
             },
             {
                 "title": "Free Range Chickens",
-                "type": "chicken",
+                "animal_type": "Chicken",
                 "breed": "Rhode Island Red",
-                "age_months": 6,
-                "price_per_unit": 25.00,
-                "quantity_available": 50,
-                "county": "Kiambu",
+                "age": 6,
+                "price": 25.00,
+                "quantity": 50,
+                "description": "Healthy free range chickens",
                 "farmer_id": farmer.id
             }
         ]
