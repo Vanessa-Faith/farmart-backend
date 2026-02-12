@@ -1,93 +1,71 @@
-#  FarmArt Backend
+# FarmArt Backend
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
-[![Flask](https://img.shields.io/badge/Flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+A robust Flask-based backend API for livestock trading and order management.
 
-> A robust Flask-based backend API for livestock trading and order management
+## Tech Stack
 
-##  Features
+- **Web Framework**: Flask 3.0.0
+- **ORM**: Flask-SQLAlchemy 3.1.1
+- **Authentication**: Flask-JWT-Extended 4.6.0
+- **Database**: SQLite/PostgreSQL
+- **Runtime**: Python 3.8+
 
-- ** Secure Authentication** - JWT-based authentication with role-based access control
-- ** User Management** - Separate roles for buyers and farmers with proper authorization
-- ** Animal Catalog** - Farmers can list available livestock with pricing and availability
-- ** Complete Order Management** - Full order lifecycle from creation to confirmation
-- ** Database Ready** - SQLAlchemy ORM with SQLite (development) and PostgreSQL (production) support
-- ** RESTful API** - Clean, well-documented REST endpoints with comprehensive error handling
-- ** Production Ready** - Environment-based configuration, logging, and error handling
+## Installation
 
-##  Tech Stack
-
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| **Web Framework** | Flask 3.0.0 | Lightweight web framework |
-| **ORM** | Flask-SQLAlchemy 3.1.1 | Database abstraction layer |
-| **Authentication** | Flask-JWT-Extended 4.6.0 | JWT token-based authentication |
-| **Database** | SQLite/PostgreSQL | Data persistence |
-| **Configuration** | python-dotenv 1.0.0 | Environment variable management |
-| **Runtime** | Python 3.8+ | Application runtime |
-
-##  Installation
-
-### Prerequisites
-- Python 3.8 or higher
-- pip package manager
-
-### Quick Start
-
-1. **Clone the repository**
+1. **Clone and setup**
    ```bash
    git clone <repository-url>
    cd farmart-backend
-   ```
-
-2. **Set up virtual environment**
-   ```bash
    python -m venv venv
-   # On Linux/Mac:
-   source venv/bin/activate
-   # On Windows:
-   venv\Scripts\activate
+   source venv/bin/activate  # Linux/Mac
+   venv\Scripts\activate     # Windows
    ```
 
-3. **Install dependencies**
+2. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Configure environment** (optional)
+3. **Environment setup**
+   Create `.env` file with:
    ```bash
-   # Development configuration
-   export FLASK_ENV=development
-   export DATABASE_URL=sqlite:///farmart.db
-   export JWT_SECRET_KEY=your-secure-secret-key-here
+   DATABASE_URL=sqlite:///instance/farmart_dev.db
+   MPESA_CONSUMER_KEY=your_key
+   MPESA_CONSUMER_SECRET=your_secret
+   MPESA_ENV=sandbox
+   MPESA_SHORTCODE=174379
+   MPESA_PASSKEY=your_passkey
+   MPESA_CALLBACK_URL=https://your-domain.com/api/orders/mpesa/callback
    ```
 
-5. **Run the application**
+4. **Initialize database**
    ```bash
-   python -m flask run
+   python -c "from app import create_app; app = create_app(); from app.models.models import db; db.create_all(app=app)"
    ```
 
-   The API will be available at `http://localhost:5000`
+5. **Run application**
+   ```bash
+   python app.py
+   ```
 
-##  API Endpoints
+## API Endpoints
 
-### Authentication
-All endpoints require a valid JWT token in the Authorization header:
+### Authentication Required
+All endpoints require JWT token:
 ```
 Authorization: Bearer <your-jwt-token>
 ```
 
 ### Order Management
+- `GET /api/orders` - Get user's orders
+- `GET /api/orders/<id>` - Get specific order
+- `POST /api/orders` - Create new order (buyers only)
+- `POST /api/orders/<id>/pay` - Initiate M-Pesa payment
+- `POST /api/orders/<id>/confirm` - Confirm order (farmers only)
+- `POST /api/orders/<id>/reject` - Reject order (farmers only)
 
-| Method | Endpoint | Description | Roles |
-|--------|----------|-------------|-------|
-| `GET` | `/api/orders` | Get user's orders | Buyers & Farmers |
-| `GET` | `/api/orders/<id>` | Get specific order | Buyers & Farmers |
-| `POST` | `/api/orders` | Create new order | Buyers only |
-| `POST` | `/api/orders/<id>/pay` | Mark order as paid | Buyers only |
-| `POST` | `/api/orders/<id>/confirm` | Confirm order | Farmers only |
-| `POST` | `/api/orders/<id>/reject` | Reject order | Farmers only |
+### M-Pesa Callback
+- `POST /api/orders/mpesa/callback` - Handle payment callbacks
 
 ### Example API Usage
 
@@ -125,71 +103,28 @@ curl -X POST http://localhost:5000/api/orders \
 ```
 
 ##  Database Schema
+## Database Schema
 
 ### Core Models
+- **User**: Buyers and farmers with role-based access
+- **Animal**: Livestock catalog with pricing and availability
+- **Order**: Purchase orders with M-Pesa integration
+- **OrderItem**: Items within orders
 
-#### User
-```sql
-CREATE TABLE user (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username VARCHAR(80) UNIQUE NOT NULL,
-    role VARCHAR(20) NOT NULL CHECK(role IN ('buyer', 'farmer'))
-);
-```
-
-#### Animal
-```sql
-CREATE TABLE animal (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name VARCHAR(100) NOT NULL,
-    farmer_id INTEGER NOT NULL,
-    available BOOLEAN DEFAULT 1,
-    price FLOAT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (farmer_id) REFERENCES user (id)
-);
-```
-
-#### Order
-```sql
-CREATE TABLE order (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    buyer_id INTEGER NOT NULL,
-    status VARCHAR(20) DEFAULT 'pending',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (buyer_id) REFERENCES user (id)
-);
-```
-
-#### OrderItem
-```sql
-CREATE TABLE order_item (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    order_id INTEGER NOT NULL,
-    animal_id INTEGER NOT NULL,
-    farmer_id INTEGER NOT NULL,
-    quantity INTEGER NOT NULL,
-    FOREIGN KEY (order_id) REFERENCES order (id),
-    FOREIGN KEY (animal_id) REFERENCES animal (id),
-    FOREIGN KEY (farmer_id) REFERENCES user (id)
-);
-```
-
-## ⚙️ Configuration
+## Configuration
 
 ### Environment Variables
+- `FLASK_ENV`: Application environment
+- `DATABASE_URL`: Database connection string
+- `JWT_SECRET_KEY`: JWT signing key
+- `MPESA_*`: M-Pesa Daraja API configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FLASK_ENV` | `development` | Application environment |
-| `DATABASE_URL` | `sqlite:///farmart.db` | Database connection string |
-| `JWT_SECRET_KEY` | `dev-secret-key-change-in-production` | JWT signing key |
+## Order Lifecycle
 
-### Configuration Profiles
+1. **Order Created** → **Pending Payment** → **Paid** → **Confirmed**
+2. **Order Created** → **Pending Payment** → **Rejected**
 
-- **Development**: Debug mode enabled, SQLite database, detailed logging
-- **Testing**: In-memory database, test-specific settings
-- **Production**: Environment variables required, optimized settings
+## License
 
 ## 🚨 Error Handling
 
@@ -301,6 +236,7 @@ For support, email support@farmart.com or join our Slack channel.
 - Flask community for the excellent web framework
 - SQLAlchemy team for powerful ORM capabilities
 - All contributors who have helped improve this project
+MIT License
 
 ---
 
