@@ -1,0 +1,27 @@
+# Python junk
+_pycache_/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# VS Code settings (personal to your computer)
+.vscode/
+
+# Environment secrets (VERY IMPORTANT)
+.env
+*.env
+
+# macOS / Windows junk (optional but good)
+.DS_Store
+Thumbs.db\_pycache_/
+.venv/
+.vscode/
+app/_pycache_/
