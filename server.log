@@ -1,0 +1,32 @@
+ * Serving Flask app 'app'
+ * Debug mode: on
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.1.10:5000
+[33mPress CTRL+C to quit[0m
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 100-989-778
+127.0.0.1 - - [11/Feb/2026 14:48:11] "GET /api/animals HTTP/1.1" 200 -
+ * Detected change in '/home/thecla/farmart-backend/add_images.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 100-989-778
+ * Detected change in '/home/thecla/farmart-backend/add_images.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 100-989-778
+ * Detected change in '/home/thecla/farmart-backend/add_images.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 100-989-778
+127.0.0.1 - - [11/Feb/2026 14:54:49] "GET /api/animals HTTP/1.1" 200 -
+127.0.0.1 - - [11/Feb/2026 14:57:28] "OPTIONS /api/auth/register HTTP/1.1" 200 -
+127.0.0.1 - - [11/Feb/2026 15:00:05] "GET /api/animals HTTP/1.1" 200 -
+127.0.0.1 - - [11/Feb/2026 15:00:05] "GET /api/animals HTTP/1.1" 200 -
+127.0.0.1 - - [11/Feb/2026 15:54:09] "OPTIONS /api/auth/register HTTP/1.1" 200 -
+ * Detected change in '/home/thecla/farmart-backend/app/__init__.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 100-989-778
