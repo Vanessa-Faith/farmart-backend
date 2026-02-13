@@ -1,4 +1,5 @@
 import base64
+import os
 from datetime import datetime
 import requests
 from flask import current_app
@@ -9,7 +10,7 @@ class MpesaError(Exception):
 
 
 def _get_base_url():
-    env = (current_app.config.get("MPESA_ENV") or "sandbox").lower()
+    env = (os.getenv("MPESA_ENV") or current_app.config.get("MPESA_ENV") or "sandbox").lower()
     if env == "sandbox":
         return "https://sandbox.safaricom.co.ke"
     return "https://api.safaricom.co.ke"
@@ -17,8 +18,12 @@ def _get_base_url():
 
 def generate_access_token():
     """Generate Daraja access token using consumer key/secret."""
-    consumer_key = current_app.config.get("MPESA_CONSUMER_KEY")
-    consumer_secret = current_app.config.get("MPESA_CONSUMER_SECRET")
+    consumer_key = os.getenv("MPESA_CONSUMER_KEY") or current_app.config.get("MPESA_CONSUMER_KEY")
+    consumer_secret = (
+        os.getenv("MPESA_CONSUMER_SECRET")
+        or os.getenv("MPESA_SECRET")
+        or current_app.config.get("MPESA_CONSUMER_SECRET")
+    )
     if not consumer_key or not consumer_secret:
         raise MpesaError("Missing MPESA_CONSUMER_KEY or MPESA_CONSUMER_SECRET")
 
@@ -48,9 +53,9 @@ def _generate_password(shortcode, passkey, timestamp):
 
 def send_stk_push(amount, phone_number, account_reference, transaction_desc):
     """Send STK Push request to Daraja."""
-    shortcode = current_app.config.get("MPESA_SHORTCODE")
-    passkey = current_app.config.get("MPESA_PASSKEY")
-    callback_url = current_app.config.get("MPESA_CALLBACK_URL")
+    shortcode = os.getenv("MPESA_SHORTCODE") or current_app.config.get("MPESA_SHORTCODE")
+    passkey = os.getenv("MPESA_PASSKEY") or current_app.config.get("MPESA_PASSKEY")
+    callback_url = os.getenv("MPESA_CALLBACK_URL") or current_app.config.get("MPESA_CALLBACK_URL")
 
     if not shortcode or not passkey or not callback_url:
         raise MpesaError("Missing MPESA_SHORTCODE, MPESA_PASSKEY, or MPESA_CALLBACK_URL")

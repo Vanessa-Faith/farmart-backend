@@ -1,13 +1,31 @@
-from flask import Blueprint, request, jsonify
+import os
+
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from sqlalchemy.exc import SQLAlchemyError
 from app import db
 from app.models.order import Order, OrderItem
 from app.models.payment import Payment
 from app.models.cart import Cart
 from app.models.animal import Animal
 from app.models.user import User
+from app.services.mpesa import send_stk_push, MpesaError
 
 orders_bp = Blueprint('orders', __name__)
+
+
+def _serialize_order_for_user(order, user):
+    """Serialize order and expose allowed UI actions for current user."""
+    data = order.to_dict()
+    is_order_farmer = user.role == 'farmer' and any(item.farmer_id == user.id for item in order.items)
+    is_order_buyer = user.role == 'buyer' and order.buyer_id == user.id
+
+    data['actions'] = {
+        'can_pay': is_order_buyer and order.status == 'pending',
+        'can_confirm': is_order_farmer and order.status not in ['rejected', 'confirmed'],
+        'can_reject': is_order_farmer and order.status == 'pending',
+    }
+    return data
 
 
 @orders_bp.route('', methods=['GET'])
@@ -34,7 +52,7 @@ def get_orders():
     else:
         orders = Order.query.filter_by(buyer_id=user_id).all()
 
-    return jsonify([order.to_dict() for order in orders]), 200
+    return jsonify([_serialize_order_for_user(order, user) for order in orders]), 200
 
 
 @orders_bp.route('/<int:id>', methods=['GET'])
@@ -62,7 +80,7 @@ def get_order(id):
         if order.buyer_id != user_id:
             return jsonify({'message': 'Access denied'}), 403
 
-    return jsonify(order.to_dict()), 200
+    return jsonify(_serialize_order_for_user(order, user)), 200
 
 
 @orders_bp.route('', methods=['POST'])
@@ -140,28 +158,66 @@ def pay_order(id):
     try:
         user_id = int(identity)
     except (TypeError, ValueError):
-        return jsonify({'message': 'Invalid token identity'}), 422
+        return jsonify({'message': 'Invalid token identity', 'error_code': 'PAYMENT_INVALID_TOKEN'}), 422
     
     data = request.get_json(silent=True)
+    if data is not None and not isinstance(data, dict):
+        return jsonify({'message': 'Invalid JSON payload', 'error_code': 'PAYMENT_INVALID_PAYLOAD'}), 400
 
     user = User.query.get(user_id)
     if not user:
-        return jsonify({'message': 'User not found'}), 404
+        return jsonify({'message': 'User not found', 'error_code': 'PAYMENT_USER_NOT_FOUND'}), 404
     if user.role != 'buyer':
-        return jsonify({'message': 'Only buyers can pay for orders'}), 403
+        return jsonify({'message': 'Only buyers can pay for orders', 'error_code': 'PAYMENT_ROLE_FORBIDDEN'}), 403
 
-    order = Order.query.get(id)
+    # Always resolve the order using the URL param id.
+    order_id = id
+    order = Order.query.get(order_id)
     if not order:
-        return jsonify({'message': 'Order not found'}), 404
+        return jsonify({'message': 'Order not found', 'error_code': 'PAYMENT_ORDER_NOT_FOUND'}), 404
 
     if order.buyer_id != user_id:
-        return jsonify({'message': 'Access denied'}), 403
+        return jsonify({'message': 'Access denied', 'error_code': 'PAYMENT_ACCESS_DENIED'}), 403
+
+    existing_payment = (
+        Payment.query
+        .filter_by(order_id=order.id, status='succeeded')
+        .order_by(Payment.created_at.desc(), Payment.id.desc())
+        .first()
+    )
+
+    if existing_payment:
+        if order.status != 'paid':
+            order.status = 'paid'
+            db.session.commit()
+        current_app.logger.info(
+            "Payment idempotent success: order_id=%s user_id=%s payment_id=%s",
+            order.id,
+            user_id,
+            existing_payment.id
+        )
+        return jsonify({
+            'message': 'Order already paid',
+            'error_code': 'PAYMENT_ALREADY_PAID',
+            'payment': existing_payment.to_dict(),
+            'order': _serialize_order_for_user(order, user)
+        }), 200
 
     if order.status == 'paid':
-        return jsonify({'message': 'Order already paid'}), 400
+        current_app.logger.info(
+            "Payment paid-status with missing record: order_id=%s user_id=%s",
+            order.id,
+            user_id
+        )
+        return jsonify({
+            'message': 'Order already paid',
+            'error_code': 'PAYMENT_ALREADY_PAID',
+            'payment': None,
+            'order': _serialize_order_for_user(order, user)
+        }), 200
 
     if order.status == 'rejected':
-        return jsonify({'message': 'Cannot pay a rejected order'}), 400
+        return jsonify({'message': 'Cannot pay a rejected order', 'error_code': 'PAYMENT_REJECTED_ORDER'}), 400
 
     provider = 'mock'
     provider_transaction_id = None
@@ -169,19 +225,154 @@ def pay_order(id):
         provider = data.get('provider', provider)
         provider_transaction_id = data.get('provider_transaction_id')
 
-    payment = Payment(
-        order_id=order.id,
-        amount=order.total_amount,
-        provider=provider,
-        provider_transaction_id=provider_transaction_id,
-        status='succeeded'
+    current_app.logger.info(
+        "Payment attempt: order_id=%s user_id=%s provider=%s",
+        order.id,
+        user_id,
+        provider
     )
-    db.session.add(payment)
 
-    order.status = 'paid'
-    db.session.commit()
+    if provider == 'mpesa':
+        phone_number = None
+        if data:
+            phone_number = data.get('phone_number')
+        phone_number = phone_number or os.getenv('MPESA_TEST_PHONE') or current_app.config.get('MPESA_TEST_PHONE')
+        if not phone_number:
+            return jsonify({
+                'message': 'phone_number is required for M-Pesa payments',
+                'error_code': 'PAYMENT_PHONE_REQUIRED'
+            }), 400
 
-    return jsonify({'message': 'Payment processed', 'payment': payment.to_dict(), 'order': order.to_dict()}), 200
+        try:
+            stk_response = send_stk_push(
+                amount=order.total_amount,
+                phone_number=phone_number,
+                account_reference=f"ORDER-{order.id}",
+                transaction_desc=f"Payment for order {order.id}",
+            )
+        except MpesaError as exc:
+            current_app.logger.exception(
+                "M-Pesa request failed: order_id=%s user_id=%s error=%s",
+                order.id,
+                user_id,
+                str(exc)
+            )
+            return jsonify({
+                'message': 'M-Pesa request failed',
+                'error_code': 'PAYMENT_MPESA_ERROR',
+                'details': str(exc)
+            }), 502
+
+        provider_transaction_id = stk_response.get('CheckoutRequestID') or provider_transaction_id
+        payment = Payment(
+            order_id=order.id,
+            amount=order.total_amount,
+            provider=provider,
+            provider_transaction_id=provider_transaction_id,
+            status='pending'
+        )
+        db.session.add(payment)
+    else:
+        payment = Payment(
+            order_id=order.id,
+            amount=order.total_amount,
+            provider=provider,
+            provider_transaction_id=provider_transaction_id,
+            status='succeeded'
+        )
+        db.session.add(payment)
+        order.status = 'paid'
+
+    try:
+        db.session.commit()
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        current_app.logger.exception(
+            "Payment DB failure: order_id=%s user_id=%s provider=%s error=%s",
+            order.id,
+            user_id,
+            provider,
+            str(exc)
+        )
+        return jsonify({
+            'message': 'Payment processing failed',
+            'error_code': 'PAYMENT_DB_ERROR'
+        }), 500
+
+    current_app.logger.info(
+        "Payment success: order_id=%s user_id=%s payment_id=%s status=%s",
+        order.id,
+        user_id,
+        payment.id,
+        payment.status
+    )
+
+    response = {
+        'message': 'Payment initiated' if provider == 'mpesa' else 'Payment processed',
+        'payment': payment.to_dict(),
+        'order': _serialize_order_for_user(order, user)
+    }
+    if provider == 'mpesa':
+        response['checkout_request_id'] = provider_transaction_id
+        response['provider_response'] = stk_response
+
+    return jsonify(response), 200
+
+
+@orders_bp.route('/mpesa/callback', methods=['POST'])
+def mpesa_callback():
+    """Handle Safaricom M-Pesa callback."""
+    payload = request.get_json(silent=True) or {}
+    callback = ((payload.get('Body') or {}).get('stkCallback') or {})
+
+    checkout_request_id = callback.get('CheckoutRequestID')
+    result_code = callback.get('ResultCode')
+
+    if checkout_request_id is None:
+        current_app.logger.warning("M-Pesa callback missing CheckoutRequestID: %s", payload)
+        return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'}), 200
+
+    payment = (
+        Payment.query
+        .filter_by(provider='mpesa', provider_transaction_id=checkout_request_id)
+        .order_by(Payment.created_at.desc(), Payment.id.desc())
+        .first()
+    )
+    if not payment:
+        current_app.logger.warning(
+            "M-Pesa callback payment not found: checkout_request_id=%s payload=%s",
+            checkout_request_id,
+            payload
+        )
+        return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'}), 200
+
+    order = Order.query.get(payment.order_id)
+    if not order:
+        current_app.logger.warning(
+            "M-Pesa callback order not found: checkout_request_id=%s payment_id=%s",
+            checkout_request_id,
+            payment.id
+        )
+        return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'}), 200
+
+    try:
+        if result_code == 0:
+            payment.status = 'succeeded'
+            order.status = 'paid'
+        else:
+            payment.status = 'failed'
+        db.session.commit()
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        current_app.logger.exception(
+            "M-Pesa callback DB failure: checkout_request_id=%s order_id=%s error=%s",
+            checkout_request_id,
+            order.id,
+            str(exc)
+        )
+        return jsonify({'message': 'Callback processing failed'}), 500
+
+    return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'}), 200
 
 
 @orders_bp.route('/<int:id>/confirm', methods=['POST'])
@@ -212,7 +403,7 @@ def confirm_order(id):
     order.status = 'confirmed'
     db.session.commit()
 
-    return jsonify({'message': 'Order confirmed', 'order': order.to_dict()}), 200
+    return jsonify({'message': 'Order confirmed', 'order': _serialize_order_for_user(order, user)}), 200
 
 
 @orders_bp.route('/<int:id>/reject', methods=['POST'])
@@ -251,7 +442,7 @@ def reject_order(id):
 
     db.session.commit()
 
-    return jsonify({'message': 'Order rejected', 'order': order.to_dict()}), 200
+    return jsonify({'message': 'Order rejected', 'order': _serialize_order_for_user(order, user)}), 200
 
 
 @orders_bp.route('/<int:id>', methods=['PUT'])
