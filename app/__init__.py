@@ -22,7 +22,12 @@ def create_app(config_name=None):
     
     db.init_app(app)
     JWTManager(app)
-    CORS(app, supports_credentials=True, origins=['http://localhost:5173', 'http://localhost:5174'])
+    allowed_origins = [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        os.environ.get('FRONTEND_URL', 'https://*.netlify.app')
+    ]
+    CORS(app, supports_credentials=True, origins=allowed_origins)
     
     from app.routes.auth import auth_bp
     from app.routes.animals import animals_bp
