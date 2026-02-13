@@ -25,9 +25,14 @@ def create_app(config_name=None):
     allowed_origins = [
         'http://localhost:5173',
         'http://localhost:5174',
-        os.environ.get('FRONTEND_URL', 'https://*.netlify.app')
+        'https://farmart-frontend-iu0e.onrender.com',
+        os.environ.get('FRONTEND_URL', '*')
     ]
-    CORS(app, supports_credentials=True, origins=allowed_origins)
+    CORS(app, 
+         resources={r"/api/*": {"origins": allowed_origins}},
+         supports_credentials=True,
+         allow_headers=['Content-Type', 'Authorization'],
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
     
     from app.routes.auth import auth_bp
     from app.routes.animals import animals_bp
